@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+
+# Runtime data - THE KEYSTORE LIVES HERE.
+# Never commit this. Losing it makes every sealed body permanently unreadable,
+# and committing it hands every body to anyone who clones the repo.
+omni-data/
+backend/omni-data/
+*.keystore
+keystore.json
+
+# Local config
+.env
+.env.local
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

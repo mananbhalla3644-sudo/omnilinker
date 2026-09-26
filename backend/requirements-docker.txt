@@ -1,0 +1,14 @@
+# Optional dependencies for the `docker` / `cloud` deployment profiles.
+#
+# The embedded profile deliberately needs none of these: it runs with the
+# dependencies in requirements.txt alone. Install them only when pointing
+# OmniLinker at real MongoDB and Neo4j instances:
+#
+#   python -m pip install -r requirements-docker.txt
+#   docker compose up -d
+#   OMNI_MODE=docker uvicorn omnilinker.api.app:app
+#
+# Both backends implement the same DocStore / GraphStore interfaces as the
+# embedded ones, so switching profiles is configuration, not a rewrite.
+motor==3.6.0
+neo4j==5.27.0

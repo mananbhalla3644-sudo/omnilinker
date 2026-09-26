@@ -1,0 +1,24 @@
+# OmniLinker backend - core (embedded mode: no external services required)
+#
+# Every pin here is the set that installs cleanly on CPython 3.14 without a
+# source build. pydantic-core in particular needs a cp314 binary wheel, and the
+# resolver will happily try to compile it from source otherwise - which fails
+# on a machine with no Rust toolchain. Install with:
+#
+#   python -m pip install --only-binary :all: -r requirements.txt
+#
+fastapi==0.141.1
+uvicorn[standard]==0.54.0
+pydantic==2.13.5
+pydantic-core==2.46.5
+python-multipart==0.0.32
+cryptography==50.0.1
+httpx==0.28.1
+PyYAML==6.0.3
+
+# --- test ---------------------------------------------------------------
+pytest==8.3.4
+
+# --- optional: the real Mongo + Neo4j path (see requirements-docker.txt) ---
+# motor==3.6.0
+# neo4j==5.27.0

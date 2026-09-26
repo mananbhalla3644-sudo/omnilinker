@@ -1,0 +1,2099 @@
+================================================================================
+                    OMNILINKER 🌐 - SYSTEM BLUEPRINT
+              Unified Data Integration & Relationship Mapping Dashboard
+                        Version 1.0 - Technical Specification
+================================================================================
+
+TABLE OF CONTENTS
+=================
+1.0 Executive Summary
+2.0 System Architecture Overview
+3.0 API Integration Plan
+4.0 Database Schema Design
+5.0 UI/UX Mockups (Text-Based)
+6.0 Sample Queries & Use Cases
+7.0 Security Model
+8.0 Implementation Roadmap
+9.0 Technical Dependencies
+
+================================================================================
+1.0 EXECUTIVE SUMMARY
+================================================================================
+
+1.1 PRODUCT OVERVIEW
+--------------------
+OmniLinker is a comprehensive data integration platform that unifies scattered 
+data sources across social media, cloud storage, messaging platforms, email 
+systems, note-taking apps, and browsing history into a single, intelligent 
+dashboard. The tool leverages graph-based visualization to reveal hidden 
+relationships between people, files, conversations, and events, providing 
+actionable insights through AI-powered analysis.
+
+1.2 KEY VALUE PROPOSITION
+-------------------------
+- **Unified View**: Break down data silos across 10+ platforms
+- **Relationship Discovery**: Automatically identify connections users are unaware of
+- **Cross-Platform Search**: Natural language queries across all integrated sources
+- **Privacy-First Design**: Local-first processing with user-controlled permissions
+- **Scalable Architecture**: Dockerized microservices ready for cloud deployment
+
+1.3 TARGET USE CASES
+--------------------
+- Corporate knowledge management (Slack + Email + Drive integration)
+- Personal productivity (WhatsApp/Telegram + Notion + Notes sync)
+- Investigative research (cross-reference contacts, files, communications)
+- Data analytics dashboards (timeline views, relationship graphs)
+
+================================================================================
+2.0 SYSTEM ARCHITECTURE OVERVIEW
+================================================================================
+
+2.1 HIGH-LEVEL ARCHITECTURE DIAGRAM
+------------------------------------
+
++----------------------------------------------------------------------------------+
+|                             CLIENT LAYER                                          |
++----------------------------------------------------------------------------------+
+|  +----------------+  +-------------------+  +-------------------+                |
+|  |   Dashboard UI  |  |    Graph View UI  |  |   File Explorer   |                |
+|  |    (React)     |  |      (D3.js)     |  |     (File System) |                |
+|  +----------------+  +-------------------+  +-------------------+                |
+|         |                        |                       |                      |
++---------|------------------------|-----------------------|----------------------+
+          |                        |                       |
+    +-----v------+            +----v----+              +----v----+
+    |   React    |            |   D3.js |              |  Next.js |
+    |   Frontend |            |  Viz Lib |              |  Router  |
+    +------------+            +---------+              +----------+
+          |                        |                       |
+          +------------------------+-----------------------+
+                              |
+                    +---------v---------+
+                    |    API Gateway     |
+                    |   (nginx/kong)    |
+                    +---------+---------+
+                              |
+          +-------------------|-------------------+
+          |                   |                   |
++---------v---------  +--------v--------+  +------v-------+
+|  Auth Service      |  User Service   |  Config Service |
+| (OAuth2 Manager)   |  (Profile Mgmt) |  (Settings DB)  |
++--------------------+------------------+-----------------+
+          ^                   ^                ^
+          |                   |                |
++---------|---------------+---|---------------|-------------+
+|           MICROSERVICE API LAYER                           |
++------------------------------------------------------------+
+          ^                   ^                ^
+          |                   |                |
++---------v---------  +--------v--------+  +------v-------+
+|   Search Service   |   Graph Service |   Sync Service  |
+| (Elasticsearch)    |   (Neo4j API)   |   (Batch/Real)  |
++--------------------+------------------+-----------------+
+          ^                   ^                ^
+          |                   |                |
++---------v---------  +--------v--------+  +------v-------+
+|  Analytics Service |  AI Service     |  Notification   |
+| (ML Insights)      |  (LLM Models)   |    System       |
++--------------------+------------------+-----------------+
+          ^                   ^                ^
+          |                   |                |
++---------|---------------+---|---------------|-------------+
+|               DATA PERSISTENCE LAYER                      |
++------------------------------------------------------------+
+          ^                   ^                ^
+          |                   |                |
+    +-----v------+   +--------v--------+  +-----v-------+
+    | MongoDB    |   | Neo4j Graph DB |  | PostgreSQL   |
+    | (Documents) |   | (Relationships)|  | (User Data)  |
+    +------------+   +----------------+  +--------------+
+          ^                   ^                ^
+          |                   |                |
++---------|---------------+---|---------------|-------------+
+|             CLOUD STORAGE INTEGRATIONS                    |
++------------------------------------------------------------+
+          ^                   ^                ^
+          |                   |                |
+    +-----v------+   +--------v--------+  +-----v-------+
+    |  Google    |   |  OneDrive      |  |  Dropbox     |
+    |  Drive API |   |  (REST)        |  |  API         |
+    +------------+   +----------------+  +--------------+
+          ^                   ^                ^
+          |                   |                |
+    +-----v------+   +--------v--------+  +-----v-------+
+    | Slack API |   | Discord API    |  |  WhatsApp     |
+    | (Webhook)  |   | (Bot Events)   |  |  Business API|
+    +------------+   +----------------+  +--------------+
+
+2.2 COMPONENT INTERACTIONS FLOW
+-------------------------------
+
++-------------------------------------------------------+
+|                    DATA INGESTION PIPELINE             |
++-------------------------------------------------------+
+|                                                       |
+|  [External APIs] --> [API Gateway] --> [Auth Service] |
+|                     |                          ^     |
+|                     v                          |   |
+|              [Load Balancer]                   |   |
+|                     |                          |   |
+|         +-----------+------------+-------------+---+
+|         |                        |                 |
+|  [Batch Import]              [Real-time Events]    |
+|         |                        |                 |
+|  +------v------+          +------v------+           |
+|  | Data        |          | Event       |           |
+|  | Processor   |----------| Queue (Kafka)|-----------+--> [Sync Service]
+|  +-------------+          +--------------+           |
+|                                                     |
+|         +-----------------------------------------+ |
+|         |                    |                     |
+|  [MongoDB Store]          [Neo4j Graph DB]          |
+|         |                    ^                     |
+|  [PostgreSQL Users]       [GraphQL/REST API]        |
+|         v                   v                        |
+|  +-----------------------------------------+         |
+|  |                  AI Service                |      |
+|  |    (NLP for Summarization & Insights)     |      |
+|  +-----------------------------------------+         |
++-------------------------------------------------------+
+
+2.3 MICROSERVICES BREAKDOWN
+---------------------------
+
+2.3.1 AUTH SERVICE
+- Manages OAuth2 flows for all external platforms
+- Stores refresh tokens and scopes in PostgreSQL
+- Issues JWTs for API access (1-hour expiry)
+- Handles token rotation and refresh logic
+
+2.3.2 USER SERVICE
+- User profile management (preferences, dark/light mode)
+- Permission matrix storage (which sources linked to which user)
+- Session management and revocation
+- Email/phone verification for new users
+
+2.3.3 SYNC SERVICE
+- Handles batch data imports (nightly cron jobs)
+- Manages real-time webhook connections
+- Deduplicates incoming data
+- Version control for imported documents
+- Conflict resolution strategy (last-write-wins with audit trail)
+
+2.3.4 GRAPH SERVICE
+- Neo4j GraphQL wrapper
+- Cypher query optimization
+- Relationship type management
+- Graph clustering algorithms (Louvain, Leiden)
+- Node degree/centrality calculations
+
+2.3.5 SEARCH SERVICE
+- Elasticsearch cluster for full-text search
+- Hybrid search: BM25 (keywords) + Dense Vector (semantic)
+- Multi-source filtering capabilities
+- Date range queries
+- Faceted search (source type, person, topic)
+
+2.3.6 AI SERVICE
+- LLM integration (local or cloud endpoints)
+- Conversation summarization pipelines
+- Entity extraction for relationship suggestions
+- Topic clustering using LDA/BERTopic
+- Predictive deadline detection
+
+2.3.7 ANALYTICS SERVICE
+- Timeline event aggregation
+- Frequency analysis across sources
+- Correlation detection
+- Anomaly detection (unusual communication patterns)
+
+================================================================================
+3.0 API INTEGRATION PLAN
+================================================================================
+
+3.1 PLATFORM INTEGRATION MATRIX
+-------------------------------
+
++------------------+------------+------------------+---------------+--------------------+
+| Platform         | Auth Method| Data Structure   | Sync Mode     | Rate Limits        |
++------------------+------------+------------------+---------------+--------------------+
+| Gmail            | OAuth2     | JSON + Multipart | Polling/Webhook| 100 req/min       |
+| Outlook          | OAuth2     | JSON             | Webhooks      | 300 req/day app   |
+| Google Drive     | OAuth2     | JSON             | Webhooks      | 1000 req/min      |
+| OneDrive         | OAuth2     | JSON             | Webhooks      | 150 req/min       |
+| Dropbox          | OAuth2     | JSON + Metadata  | API Polling   | 100 calls/30s app |
+| Slack            | OAuth2     | Events/Webhooks  | Real-time     | 4,000 calls/hour  |
+| Discord          | Bot Token  | JSON             | Webhook       | No rate limits    |
+| WhatsApp Business| API Key    | JSON             | Webhook       | 1,000 msgs/day    |
+| Notion           | OAuth2     | JSON + Blocks    | Polling      | 50 req/min        |
+| Evernote         | OAuth2     | JSON             | Polling      | 600 req/day app   |
+| YouTube          | OAuth2     | JSON             | Webhooks      | 1,000 units/hour  |
++------------------+------------+------------------+---------------+--------------------+
+
+3.2 DETAILED API CONNECTOR SPECIFICATIONS
+------------------------------------------
+
+3.2.1 EMAIL CONNECTORS (Gmail/Outlook)
+--------------------------------------
+
+Connector: email-connector-base.py
+
+```python
+from typing import Dict, List, Optional
+import asyncio
+from datetime import datetime
+from bson import ObjectId
+
+class EmailConnector:
+    """Base class for email platform connectors"""
+    
+    def __init__(self, config: Dict, auth_tokens: Dict):
+        self.platform = config['platform']
+        self.api_base = config.get('api_base', '')
+        self.auth_tokens = auth_tokens
+        self.client = None
+        
+    async def authenticate(self) -> bool:
+        """Handle OAuth2 flow or API key authentication"""
+        pass
+    
+    async def fetch_inbox(self, folder: str = "INBOX") -> List[Dict]:
+        """Fetch email messages from specified folder"""
+        pass
+    
+    async def subscribe_to_webhooks(self, web_endpoint: str) -> bool:
+        """Subscribe to incoming webhook events for real-time sync"""
+        pass
+    
+    async def process_webhook(self, event_data: Dict) -> None:
+        """Handle incoming webhook events"""
+        pass
+
+# Gmail-specific connector implementation
+class GmailConnector(EmailConnector):
+    API_VERSION = "v1"
+    SCOPES = ["https://www.googleapis.com/auth/gmail.readonly",
+              "https://www.googleapis.com/auth/gmail.send"]
+    
+    async def authenticate(self) -> bool:
+        """Implement Google OAuth2 flow"""
+        from google.oauth2.credentials import Credentials
+        import google.auth.transport.requests
+        
+        auth_request = google.auth.transport.requests.Request()
+        self.tokens['refresh_token'].refresh(auth_request)
+        return True
+    
+    async def fetch_inbox(self, folder: str = "INBOX", 
+                         label: Optional[str] = None) -> List[Dict]:
+        """Fetch emails with attachments and metadata"""
+        service = build('gmail', 'v1', 
+                       credentials=self.tokens['refresh_token'])
+        messages_result = service.messages().list(
+            userId='me',
+            pageToken=self.last_sync.get('pageToken') or None,
+            maxResults=50,
+            q=f"'{label}' in:labels" if label else None
+        ).execute()
+        
+        processed_emails = []
+        for msg in messages_result['messages']:
+            email_id = msg['id']
+            raw_message = service.users().messages().get(
+                userId='me', messageId=email_id,
+                format='full'
+            ).execute()
+            
+            email_data = {
+                'platform': 'gmail',
+                'message_id': raw_message['id'],
+                'thread_id': raw_message.get('threadId'),
+                'subject': raw_message['payload']['headers'][0]['value'],
+                'sender': self._parse_email(raw_message['payload']['headers'][0]),
+                'recipients': self._parse_emails(
+                    raw_message['payload']['headers']
+                ),
+                'body': self._extract_text(raw_message),
+                'html_body': raw_message.get('payload', {}).get('parts', [])[-1].get('body', {}).get('data') if len(raw_message.get('payload', {}).get('parts', [])) > 0 else None,
+                'attachments': self._parse_attachments(raw_message),
+                'labels': [h['value'].replace('Label ', '') 
+                          for h in raw_message['payload']['headers'] 
+                          if h['name'] == 'Label' or h['name'] == 'Labels'],
+                'date': datetime.fromtimestamp(
+                    raw_message['internalDate'] / 1000
+                ).isoformat(),
+                'read': any(h['value'].startswith('READ') for h in 
+                          raw_message['payload']['headers']),
+                'size_bytes': raw_message.get('sizeEstimate', 0)
+            }
+            processed_emails.append(email_data)
+        
+        if self.last_sync:
+            self.last_sync['pageToken'] = messages_result.get('nextPageToken')
+        
+        return processed_emails
+    
+    def _parse_email(self, header_dict: Dict) -> Dict[str, str]:
+        """Parse 'From' header into name and address"""
+        from_val = header_dict['value'][0].split('<')[1].split('>')[0]
+        name_val = header_dict['value'][0].split(' ')[0] if header_dict['value'][0].startswith('"') else ''
+        return {'name': name_val, 'address': from_val}
+    
+    def _parse_emails(self, headers: List[Dict]) -> List[Dict]:
+        """Parse 'To', 'Cc', 'Bcc' headers"""
+        email_fields = ['to', 'cc']
+        emails = []
+        for field in email_fields:
+            if field in headers:
+                header = headers[field]
+                for val in header.get('value', []):
+                    if '<' in val and '>' in val:
+                        addr = val.split('<')[1].split('>')[0]
+                        emails.append({'role': field, 'address': addr})
+        return emails
+
+# Outlook-specific connector implementation
+class OutlookConnector(EmailConnector):
+    """Microsoft Graph API integration"""
+    
+    async def authenticate(self) -> bool:
+        """Implement Microsoft OAuth2 flow with Azure AD"""
+        from msal import PublicClientApplication
+        
+        app = PublicClientApplication(
+            self.config['client_id'],
+            authority=self.config['tenant']
+        )
+        
+        result = app.acquire_token_by_authorization_code(
+            self.code_verifier,
+            scopes=[
+                "Mail.Read",
+                "Mail.Send",
+                "Files.Read"
+            ]
+        )
+        
+        if 'access_token' in result:
+            self.access_token = result['access_token']
+            return True
+        return False
+
+3.2.2 CLOUD STORAGE CONNECTORS (Drive/OneDrive/Dropbox)
+-------------------------------------------------------
+
+Connector: cloud-storage-connector.py
+
+```python
+from typing import Dict, List
+from datetime import datetime
+from bson import ObjectId
+
+class CloudStorageConnector:
+    """Base class for cloud storage connectors"""
+    
+    def __init__(self, config: Dict):
+        self.platform = config['platform']
+        self.api_base = config.get('api_base', '')
+        self.folder_mapping = {  # Map user folder structures to universal IDs
+            'Documents': 'documents-universal-001',
+            'Work': 'work-universal-002',
+            'Personal': 'personal-universal-003'
+        }
+        
+    async def authenticate(self) -> bool:
+        pass
+    
+    async def list_files(self, folder_id: str = None, 
+                        recursive: bool = False) -> List[Dict]:
+        """List files with metadata"""
+        pass
+    
+    async def upload_file(self, file_path: str, 
+                         metadata: Dict = {}) -> Dict:
+        """Upload and link to OmniLinker universal ID"""
+        pass
+    
+    async def download_file(self, file_id: str) -> bytes:
+        """Retrieve file content"""
+        pass
+
+# Google Drive connector
+class GoogleDriveConnector(CloudStorageConnector):
+    """Google Drive integration"""
+    
+    SERVICE_NAME = "drive"
+    
+    async def authenticate(self) -> bool:
+        from google.oauth2.credentials import Credentials
+        import google.auth.transport.requests
+        
+        auth_request = google.auth.transport.requests.Request()
+        self.tokens['refresh_token'].refresh(auth_request)
+        return True
+    
+    async def list_files(self, folder_id: str = None, 
+                        recursive: bool = False) -> List[Dict]:
+        """List files with Drive metadata"""
+        service = build('drive', 'v3', credentials=self.tokens['refresh_token'])
+        
+        query = f"mimeType != 'application/vnd.google-apps.folder'"
+        if folder_id:
+            query += f" and '{folder_id}' in parents"
+        
+        files = []
+        page_token = None
+        
+        while True:
+            request = service.files().list(
+                pageSize=100,
+                q=query,
+                fields="files(id,name,mimeType,sizeInBytes,"
+                       "createdTime,modifiedTime,webContentLink,parents)",
+                orderBy="name asc",
+                pageToken=page_token
+            )
+            
+            result = request.execute()
+            for file in result.get('files', []):
+                files.append({
+                    'platform': 'google_drive',
+                    'universal_id': self._generate_universal_id(file['id']),
+                    'original_id': file['id'],
+                    'name': file['name'],
+                    'mimetype': file['mimeType'],
+                    'size_bytes': file.get('sizeInBytes', 0),
+                    'created_at': datetime.fromisoformat(
+                        file['createdTime'].replace('Z', '+00:00')
+                    ),
+                    'modified_at': datetime.fromisoformat(
+                        file['modifiedTime'].replace('Z', '+00:00')
+                    ),
+                    'parent_ids': [p.replace(':driveFile', '') for p in 
+                                   file.get('parents', [])],
+                    'is_folder': False,  # Already filtered
+                    'web_content_link': file.get('webContentLink'),
+                    'owned_by': self._extract_owners(file['id'])
+                })
+            
+            page_token = result.get('nextPageToken')
+            if not page_token:
+                break
+        
+        return files
+    
+    def _generate_universal_id(self, drive_file_id: str) -> str:
+        """Generate universal ID for cross-platform file linking"""
+        import hashlib
+        content_hash = hashlib.sha256(
+            f"file:{drive_file_id}:{datetime.now().isoformat()}".encode()
+        ).hexdigest()[:32]
+        return f"file-{content_hash}"
+    
+    async def download_file(self, file_id: str) -> bytes:
+        """Download file content with chunked reading for large files"""
+        service = build('drive', 'v3', credentials=self.tokens['refresh_token'])
+        request = service.files().export_media(
+            fileId=file_id,
+            mimeType='application/octet-stream'
+        ).execute()
+        
+        # Handle streaming for larger files
+        response = service.files().get_media(
+            fileId=file_id,
+            mimetype='application/octet-stream',
+            altMedia=True
+        )
+        
+        content_type = headers.get('Content-Type', '')
+        if 'text' in content_type or content_type.endswith('/xml') or \
+           content_type.endswith('/json'):
+            return response.decode()
+        return response
+
+# OneDrive connector with Bearer token rotation
+class OneDriveConnector(CloudStorageConnector):
+    """OneDrive integration with Azure AD"""
+    
+    async def authenticate(self) -> bool:
+        from msal import ConfidentialClientApplication
+        
+        app = ConfidentialClientApplication(
+            self.config['client_id'],
+            self.config['tenant'],
+            self.config['client_secret']
+        )
+        
+        result = app.acquire_token_for_client(
+            scopes=["https://graph.microsoft.com/Files.Read"]
+        )
+        
+        if 'access_token' in result:
+            self.access_token = result['access_token']
+            self.token_expiry = datetime.fromisoformat(result['expires_on'][:-1])
+            return True
+        return False
+    
+    async def subscribe_to_webhooks(self, web_endpoint: str) -> bool:
+        """Subscribe to OneDrive change notifications"""
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.post(
+            f"{self.api_base}/v1.0/subscriptions",
+            headers=headers,
+            json={
+                "changeType": ["created", "updated", "deleted"],
+                "resource": "item",
+                "notificationUrl": web_endpoint,
+                "expirationDateTime": (datetime.utcnow() + timedelta(days=30)).isoformat()
+            }
+        )
+        
+        return response.status_code == 201
+
+3.2.3 MESSAGING CONNECTORS (Slack/Discord/WhatsApp)
+----------------------------------------------------
+
+Connector: messaging-connector.py
+
+```python
+from typing import Dict, List, Callable
+import json
+from datetime import datetime
+from bson import ObjectId
+from enum import Enum
+
+class MessageEventType(Enum):
+    """Event types for real-time message ingestion"""
+    MESSAGE_CREATED = "message.created"
+    MESSAGE_UPDATED = "message.updated"
+    MESSAGE_DELETED = "message.deleted"
+    MEMBER_JOINED = "member.joined_or_left"
+    CHANNEL_CREATED = "channel.created"
+    FILE_UPLOADED = "file.uploaded"
+
+class MessagingConnector:
+    """Base class for messaging platform connectors"""
+    
+    def __init__(self, config: Dict):
+        self.platform = config['platform']
+        self.api_base = config.get('api_base', '')
+        self.webhook_endpoint = None
+        
+        # Event handlers for real-time updates
+        self.event_handlers: List[Callable] = []
+        
+    def register_handler(self, event_type: MessageEventType, handler: Callable):
+        """Register callback for message events"""
+        self.event_handlers.append({
+            'event': event_type,
+            'handler': handler
+        })
+    
+    async def authenticate(self) -> bool:
+        pass
+    
+    async def process_webhook(self, event_data: Dict) -> None:
+        """Process incoming webhook events"""
+        event_type = MessageEventType(event_data.get('type', ''))
+        for handler_info in self.event_handlers:
+            if handler_info['event'] == event_type:
+                await handler_info['handler'](event_data)
+
+# Slack connector with events API
+class SlackConnector(MessagingConnector):
+    """Slack integration via Events API and Webhooks"""
+    
+    async def authenticate(self) -> bool:
+        from requests_oauthlib import OAuth2Session
+        
+        auth_url = "https://slack.com/oauth/v2/authorize"
+        token_url = "https://slack.com/api/oauth.access"
+        
+        session = OAuth2Session(None, redirect_uri=self.config['redirect_uri'])
+        auth_response = session.get(auth_url + f"?state={self.state}")
+        
+        code = auth_response.url.split('code=')[1]
+        params = {
+            'code': code,
+            'client_id': self.config['client_id'],
+            'client_secret': self.config['client_secret']
+        }
+        
+        token_response = requests.post(token_url, data=params)
+        self.tokens.update(json.loads(token_response.text))
+        return True
+    
+    async def subscribe_to_events(self) -> bool:
+        """Subscribe to Slack events API for real-time updates"""
+        auth_headers = {
+            "Authorization": f"Bearer {self.tokens['access_token']}",
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.post(
+            f"{self.api_base}/events",
+            headers=auth_headers,
+            json={
+                "type_whitelisted": [
+                    "message.channels",
+                    "channel_created",
+                    "team_join",
+                    "file.shared"
+                ],
+                "event_callback_url": self.webhook_endpoint
+            }
+        )
+        
+        return response.status_code == 200
+    
+    async def process_webhook(self, event_data: Dict) -> None:
+        """Process Slack webhook events"""
+        if event_data.get('type') == 'message.channels':
+            await self._handle_message(event_data['event'])
+    
+    async def _handle_message(self, event_dict: Dict) -> None:
+        """Handle incoming message event"""
+        channel = event_dict['channel']
+        user = event_dict['user'] if 'user' in event_dict else None
+        
+        # Extract conversation participants from thread history
+        thread_messages = []
+        if 'thread_ts' in event_dict:
+            thread_response = requests.get(
+                f"{self.api_base}/channels/{channel}/messages",
+                headers={"Authorization": f"Bearer {self.tokens['access_token']}"},
+                params={'around': event_dict['thread_ts'], 'limit': 50}
+            )
+            thread_messages = thread_response.json().get('messages', [])
+        
+        message_data = {
+            'platform': 'slack',
+            'channel_id': channel,
+            'user_id': user,
+            'username': event_dict.get('user', {}).get('name'),
+            'text': event_dict.get('text', ''),
+            'ts': datetime.fromtimestamp(event_dict['ts'] / 1000).isoformat(),
+            'is_threaded': 'thread_ts' in event_dict,
+            'thread_messages': thread_messages,
+            'attachments': event_dict.get('attachments', []),
+            'reactions': event_dict.get('reactions', []),
+            'files': self._parse_files(event_dict)
+        }
+        
+        # Trigger handlers
+        for handler_info in self.event_handlers:
+            if handler_info['event'] == MessageEventType.MESSAGE_CREATED:
+                await handler_info['handler'](message_data)
+
+# Discord connector with slash commands and webhooks
+class DiscordConnector(MessagingConnector):
+    """Discord integration via REST API and Webhooks"""
+    
+    async def authenticate(self) -> bool:
+        """Authenticate using Discord Bot Token"""
+        self.bot_token = self.config['bot_token']
+        return True
+    
+    async def subscribe_to_webhooks(self, web_endpoint: str) -> bool:
+        """Create webhook for channel notifications"""
+        auth_headers = {
+            "Authorization": f"Bot {self.bot_token}"
+        }
+        
+        response = requests.post(
+            f"{self.api_base}/channels/{self.config['channel_id']}/webhooks",
+            headers=auth_headers,
+            json={
+                "name": f"{self.platform}-omnilinker-webhook",
+                "avatar": None  # Use default
+            }
+        )
+        
+        self.webhook = response.json()
+        return response.status_code == 201
+    
+    async def process_webhook(self, event_data: Dict) -> None:
+        """Process Discord webhook events"""
+        message_data = {
+            'platform': 'discord',
+            'channel_id': event_data.get('id'),
+            'guild_id': event_data.get('guild_id'),
+            'username': event_data['author']['username'],
+            'discriminator': event_data['author'].get('discriminator', ''),
+            'avatar_url': event_data['author'].get('avatar'),
+            'content': event_data.get('content', ''),
+            'timestamp': datetime.fromisoformat(event_data['timestamp']),
+            'mentions': [m['username'] for m in event_data.get('mentions', [])],
+            'embeds': event_data.get('embeds', []),
+            'attachments': event_data.get('attachments', []),
+            'reactions': event_data.get('reactions', [])
+        }
+        
+        # Trigger handlers
+        for handler_info in self.event_handlers:
+            if handler_info['event'] == MessageEventType.MESSAGE_CREATED:
+                await handler_info['handler'](message_data)
+
+# WhatsApp Business API connector
+class WhatsAppConnector(MessagingConnector):
+    """WhatsApp Business API integration"""
+    
+    async def authenticate(self) -> bool:
+        """Authenticate using WhatsApp Business API credentials"""
+        from requests_oauthlib import OAuth2Session
+        
+        auth_url = "https://graph.facebook.com/v18.0/oauth/authorize"
+        token_url = "https://graph.facebook.com/v18.0/oauth/access_token"
+        
+        session = OAuth2Session(None, redirect_uri=self.config['redirect_uri'])
+        auth_response = session.get(auth_url + f"?code={self.code}")
+        
+        params = {
+            'code': self.code,
+            'grant_type': 'authorization_code',
+            'client_id': self.config['client_id']
+        }
+        
+        token_response = requests.post(
+            token_url,
+            params=params,
+            headers={'Authorization': f'Bearer {self.auth_headers}'}
+        )
+        
+        self.access_token = json.loads(token_response.text)['access_token']
+        return True
+    
+    async def process_webhook(self, event_data: Dict) -> None:
+        """Process WhatsApp webhook events"""
+        message_data = {
+            'platform': 'whatsapp_business',
+            'wa_id': event_data['messages'][0]['conversation']['id'],
+            'sender_name': event_data['messages'][0].get('from', {}).get('name'),
+            'sender_jid': event_data['messages'][0].get('from', {}),
+            'type': event_data['messages'][0].get('type'),
+            'content': self._extract_content(event_data['messages'][0]),
+            'timestamp': datetime.fromtimestamp(
+                event_data['messages'][0]['timestamp'] / 1000
+            ).isoformat(),
+            'status': event_data.get('metadata', {}).get('display_text'),
+            'images': self._parse_images(event_data['messages']),
+            'documents': self._parse_documents(event_data['messages'])
+        }
+        
+        # Trigger handlers
+        for handler_info in self.event_handlers:
+            if handler_info['event'] == MessageEventType.MESSAGE_CREATED:
+                await handler_info['handler'](message_data)
+
+3.2.4 NOTES CONNECTORS (Notion/Evernote)
+----------------------------------------
+
+Connector: notes-connector.py
+
+```python
+from typing import Dict, List
+from datetime import datetime
+import hashlib
+
+class NotesConnector:
+    """Base class for note-taking platform connectors"""
+    
+    def __init__(self, config: Dict):
+        self.platform = config['platform']
+        self.api_base = config.get('api_base', '')
+        
+        # Universal document ID generator
+        def _generate_universal_id(doc_id: str, metadata: Dict) -> str:
+            import hashlib
+            content_hash = hashlib.sha256(
+                f"doc:{doc_id}:{metadata.get('created_at', '').isoformat()}".encode()
+            ).hexdigest()[:32]
+            return f"doc-{content_hash}"
+        
+        self._universal_id_generator = _generate_universal_id
+    
+    async def authenticate(self) -> bool:
+        pass
+    
+    async def fetch_notes(self, workspace_filter: str = None) -> List[Dict]:
+        """Fetch notes from all platforms"""
+        pass
+
+# Notion connector with block-based parsing
+class NotionConnector(NotesConnector):
+    """Notion integration with full block tree support"""
+    
+    async def authenticate(self) -> bool:
+        from requests_oauthlib import OAuth2Session
+        
+        auth_url = "https://api.notion.com/v1/oauth/authorize"
+        token_url = "https://api.notion.v1/oauth/token"
+        
+        session = OAuth2Session(None, redirect_uri=self.config['redirect_uri'])
+        auth_response = session.get(auth_url + f"?code={self.code}")
+        
+        params = {
+            'code': self.code,
+            'client_id': self.config['client_id'],
+            'grant_type': 'authorization_code'
+        }
+        
+        token_response = requests.post(
+            token_url,
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
+            data=params
+        )
+        
+        self.access_token = json.loads(token_response.text)['access_token']
+        return True
+    
+    async def fetch_notes(self) -> List[Dict]:
+        """Fetch all pages from Notion workspaces"""
+        auth_headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+        }
+        
+        pages = []
+        workspace_pages = await self._fetch_workspace_pages()
+        
+        for page_id, workspace_info in workspace_pages.items():
+            page_response = requests.get(
+                f"{self.api_base}/pages/{page_id}",
+                headers=auth_headers
+            )
+            
+            if page_response.status_code == 200:
+                page_data = page_response.json()
+                
+                # Extract blocks recursively
+                blocks = self._parse_blocks(page_data['properties'])
+                
+                pages.append({
+                    'platform': 'notion',
+                    'universal_id': self._generate_universal_id(
+                        page_id, workspace_info
+                    ),
+                    'original_id': page_id,
+                    'workspace_id': workspace_info.get('workspace_id'),
+                    'title': page_data['properties'].get('name', {}).get('title', [{}])[0].get('text', {}).get('content', ''),
+                    'type': self._identify_page_type(page_data),
+                    'created_at': datetime.fromisoformat(
+                        page_data['created_time'].replace('Z', '+00:00')
+                    ),
+                    'updated_at': datetime.fromisoformat(
+                        page_data['last_edited_time'].replace('Z', '+00:00')
+                    ),
+                    'blocks': blocks,
+                    'parent_id': page_data.get('parent', {}).get('page_id'),
+                    'children_count': len(self._fetch_children(page_id))
+                })
+        
+        return pages
+    
+    def _parse_blocks(self, properties: Dict) -> List[Dict]:
+        """Parse Notion block structure with rich text support"""
+        blocks = []
+        content_types = ['paragraph', 'heading_1', 'heading_2', 
+                        'bullet_list', 'numbered_list', 'quote', 
+                        'image', 'video', 'code']
+        
+        for prop_name, prop_data in properties.items():
+            if prop_name.startswith('block_'):
+                block_type = prop_name.replace('block_', '')
+                blocks.append({
+                    'type': block_type,
+                    'content': prop_data.get('text', {}).get('content', ''),
+                    'rich_text': self._parse_rich_text(prop_data)
+                })
+        
+        return blocks
+
+# Evernote connector with EDN parsing
+class EvernoteConnector(NotesConnector):
+    """Evernote integration with EDN note format support"""
+    
+    async def authenticate(self) -> bool:
+        from requests_oauthlib import OAuth2Session
+        
+        auth_url = "https://dev.evernote.com/oauth"
+        token_url = "https://sandbox.evernote.com/oauth/authorize"
+        
+        session = OAuth2Session(None, redirect_uri=self.config['redirect_uri'])
+        auth_response = session.get(auth_url + f"?code={self.code}")
+        
+        params = {
+            'code': self.code,
+            'client_id': self.config['client_id'],
+            'grant_type': 'authorization_code'
+        }
+        
+        token_response = requests.post(token_url, data=params)
+        
+        self.access_token = json.loads(token_response.text)['access_token']
+        return True
+    
+    async def fetch_notes(self) -> List[Dict]:
+        """Fetch notes from Evernote notebooks"""
+        auth_headers = {
+            "Authorization": f"Bearer {self.access_token}"
+        }
+        
+        notes = []
+        notebook_list_response = requests.get(
+            f"{self.api_base}/v2/notebooks",
+            headers=auth_headers
+        )
+        
+        notebooks = notebook_list_response.json().get('notebooks', [])
+        
+        for notebook in notebooks:
+            # Check if user has access to this notebook
+            if self._can_access(notebook):
+                notebook_response = requests.get(
+                    f"{self.api_base}/v2/notebooks/{notebook['guid']}/notes",
+                    headers=auth_headers
+                )
+                
+                notebook_notes = notebook_response.json().get('notes', [])
+                
+                for note in notebook_notes:
+                    # Fetch full note with EDN content
+                    note_response = requests.get(
+                        f"{self.api_base}/v2/notes/{note['guid']}",
+                        headers=auth_headers
+                    )
+                    
+                    if note_response.status_code == 200:
+                        note_data = note_response.json()
+                        
+                        # Parse EDN content
+                        edn_content = self._parse_edn(note_data.get('content', b''))
+                        
+                        notes.append({
+                            'platform': 'evernote',
+                            'universal_id': self._generate_universal_id(
+                                note['guid'], 
+                                {'notebook_id': notebook['guid']}
+                            ),
+                            'original_id': note['guid'],
+                            'title': note.get('title', ''),
+                            'notebook_name': notebook.get('name', ''),
+                            'created_at': datetime.fromtimestamp(
+                                note['created'] / 1000
+                            ).isoformat(),
+                            'updated_at': datetime.fromtimestamp(
+                                note['lastUpdated'] / 1000
+                            ).isoformat(),
+                            'tags': self._parse_tags(note.get('tagNames', [])),
+                            'content_type': 'edn' if note.get('content') else 'html',
+                            'content': note_data.get('content', b''),
+                            'resources': note_data.get('resources', [])
+                        })
+        
+        return notes
+    
+    def _parse_edn(self, edn_bytes: bytes) -> Dict:
+        """Parse Evernote EDN format"""
+        try:
+            import ednlib  # pip install ednlib
+            edn_dict = ednlib.decode(edn_bytes)
+            
+            return {
+                'title': str(edn_dict.get('Title', '')),
+                'content': str(edn_dict.get('Content', '')),
+                'attributes': self._parse_attributes(edn_dict.get('@attributes', {}))
+            }
+        except ImportError:
+            # Fallback to string parsing
+            return {'title': '', 'content': str(edn_bytes.decode()), 'attributes': {}}
+
+================================================================================
+4.0 DATABASE SCHEMA DESIGN
+================================================================================
+
+4.1 MONGODB COLLECTIONS (Document Storage)
+------------------------------------------
+
+4.1.1 USERS COLLECTION
+```json
+{
+  "_id": ObjectId("507f1f77bcf86cd799439011"),
+  "email": "user@example.com",
+  "username": "johndoe",
+  "created_at": "2024-01-15T10:30:00Z",
+  "last_login": "2024-01-20T14:45:00Z",
+  "preferences": {
+    "theme": "dark",
+    "default_view": "dashboard",
+    "language": "en"
+  },
+  "subscription_tier": "premium",
+  "email_verified": true,
+  "mfa_enabled": false
+}
+```
+
+4.1.2 SOURCE_PERMISSIONS COLLECTION
+```json
+{
+  "_id": ObjectId("507f1f77bcf86cd799439012"),
+  "user_id": "ObjectId('...')",
+  "source_type": "email",
+  "source_platform": "gmail",
+  "permission_scope": [
+    {"type": "read", "resource": "inbox"},
+    {"type": "send", "resource": "gmail_account"}
+  ],
+  "token_expires_at": "2024-06-15T10:30:00Z",
+  "webhook_url": null,
+  "last_sync": "2024-01-20T14:30:00Z",
+  "sync_interval_minutes": 15,
+  "is_active": true
+}
+```
+
+4.1.3 EMAILS COLLECTION
+```json
+{
+  "_id": ObjectId("507f1f77bcf86cd799439013"),
+  "universal_id": "email-universal-001",
+  "source_type": "email",
+  "platform": "gmail",
+  "metadata": {
+    "message_id": "msg_12345abcde",
+    "thread_id": "thread_xyz789"
+  },
+  "subject": "Project Proposal Discussion",
+  "sender": {
+    "name": "Alice Johnson",
+    "email_address": "alice.johnson@company.com",
+    "platform_id": "user_abc123def456"
+  },
+  "recipients": [
+    {"role": "to", "address": "john.doe@company.com"},
+    {"role": "cc", "address": "bob.smith@partner.com"}
+  ],
+  "body": "Hi John,\n\nI wanted to discuss the project proposal...",
+  "html_body": "<p>Hi John,</p><p>I wanted to discuss...</p>",
+  "attachments": [
+    {
+      "name": "proposal.pdf",
+      "size_bytes": 245632,
+      "content_type": "application/pdf",
+      "universal_id": "file-universal-proposal001"
+    }
+  ],
+  "labels": ["inbox", "important"],
+  "is_read": false,
+  "is_starred": true,
+  "date": "2024-01-20T09:15:30Z",
+  "size_bytes": 87234
+}
+```
+
+4.1.4 FILES COLLECTION (Unified Storage)
+```json
+{
+  "_id": ObjectId("507f1f77bcf86cd799439014"),
+  "universal_id": "file-universal-002",
+  "source_type": "file",
+  "platform": "google_drive",
+  "metadata": {
+    "original_file_id": "1abc123xyz",
+    "parent_ids": ["folder_work_001"]
+  },
+  "name": "project_specs_v2.docx",
+  "mimetype": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "size_bytes": 45678,
+  "content_hash": "sha256:abc123...",
+  "created_at": "2024-01-18T16:30:00Z",
+  "modified_at": "2024-01-20T11:45:00Z",
+  "web_content_link": "https://drive.google.com/...",
+  "owner": {
+    "platform_id": "user_abc123def456",
+    "display_name": "John Doe"
+  },
+  "shared_with": [
+    {"user_id": "user_xyz789", "permission_level": "editor"}
+  ],
+  "is_shared": true
+}
+```
+
+4.1.5 MESSAGES COLLECTION (Cross-Platform)
+```json
+{
+  "_id": ObjectId("507f1f77bcf86cd799439015"),
+  "universal_id": "msg-universal-001",
+  "source_type": "messaging",
+  "platform": "slack",
+  "metadata": {
+    "channel_id": "C0ABC123",
+    "thread_ts": null
+  },
+  "sender": {
+    "user_id": "U0ABC123",
+    "username": "alice.johnson",
+    "display_name": "Alice Johnson"
+  },
+  "content": "Hey team, the project specs document is ready for review.",
+  "is_threaded": false,
+  "timestamp": "2024-01-20T11:30:00Z",
+  "attachments": [
+    {
+      "universal_id": "file-universal-proposal001",
+      "platform_file_id": "1abc123xyz",
+      "name": "project_specs_v2.docx"
+    }
+  ],
+  "reactions": [
+    {"emoji": "+1", "count": 5},
+    {"emoji": "👏", "count": 2}
+  ],
+  "is_edited": false,
+  "edited_at": null
+}
+```
+
+4.1.6 NOTES COLLECTION
+```json
+{
+  "_id": ObjectId("507f1f77bcf86cd799439016"),
+  "universal_id": "doc-universal-001",
+  "source_type": "notes",
+  "platform": "notion",
+  "metadata": {
+    "original_page_id": "page_abc123",
+    "workspace_id": "workspace_xyz789"
+  },
+  "title": "Q1 Project Roadmap",
+  "type": "page",
+  "created_at": "2024-01-10T09:00:00Z",
+  "updated_at": "2024-01-20T08:30:00Z",
+  "blocks": [
+    {
+      "type": "heading_1",
+      "content": "Q1 Project Roadmap",
+      "rich_text": []
+    },
+    {
+      "type": "paragraph",
+      "content": "Key deliverables for Q1 include...",
+      "rich_text": [{"text": {"content": "Key deliverables for Q1 include..."}}]
+    },
+    {
+      "type": "bullet_list",
+      "content": "- Sprint planning\n- Team onboarding",
+      "rich_text": []
+    }
+  ],
+  "parent_id": null,
+  "children_count": 0
+}
+```
+
+4.1.7 BROWSING_HISTORY COLLECTION
+```json
+{
+  "_id": ObjectId("507f1f77bcf86cd799439017"),
+  "universal_id": "url-universal-001",
+  "source_type": "browsing_history",
+  "url": "https://www.example.com/project/roadmap",
+  "title": "Q1 Project Roadmap - Example",
+  "mimetype": null,
+  "timestamp": "2024-01-20T11:45:30Z",
+  "referrer_url": "https://slack.com/",
+  "is_homepage": false,
+  "metadata": {
+    "user_agent": "Mozilla/5.0...",
+    "browser": "Chrome"
+  }
+}
+```
+
+4.1.8 RELATIONSHIPS_COLLECTION (Hybrid)
+```json
+{
+  "_id": ObjectId("507f1f77bcf86cd799439018"),
+  "source_type": "messaging",
+  "platform": "slack",
+  "source_data_id": "C0ABC123",
+  "source_name": "#general",
+  "related_item": {
+    "source_type": "file",
+    "universal_id": "file-universal-proposal001",
+    "relation_context": "mentioned_in_message"
+  },
+  "context": "Project specs document mentioned by Alice Johnson in #general channel",
+  "created_at": "2024-01-20T11:30:00Z",
+  "confidence_score": 1.0
+}
+```
+
+4.1.9 SYNC_LOGS COLLECTION (Audit Trail)
+```json
+{
+  "_id": ObjectId("507f1f77bcf86cd799439019"),
+  "user_id": "ObjectId('...')",
+  "source_type": "email",
+  "platform": "gmail",
+  "operation": "sync_complete",
+  "records_processed": 245,
+  "new_records": 12,
+  "updated_records": 3,
+  "deleted_records": 0,
+  "started_at": "2024-01-20T02:00:00Z",
+  "completed_at": "2024-01-20T02:15:30Z",
+  "duration_seconds": 930,
+  "error_messages": []
+}
+```
+
+================================================================================
+5.0 UI/UX MOCKUPS (Text-Based)
+================================================================================
+
+5.1 DASHBOARD VIEW - OVERVIEW LAYOUT
+------------------------------------
+
++-----------------------------------------------------------------------------+
+|  OMNILINKER DASHBOARD              [🔍 Search...]    [+ Add Source]        |
+|  Last synced: Just now                      Theme: 🌙 Dark                  |
++-----------------------------------------------------------------------------+
+|  +--------------------------------------------------+  +-------------------+ |
+|  |  WELCOME, JOHN DOE                              |  |   QUICK STATS      | |
+|  +--------------------------------------------------+  +-------------------+ |
+|                                           |  +-------------------+          |
+|  +----------------------------------------+  |  📊 Connected Sources: 7       | |
+|  |  TIMELINE VIEW                        |  |  🔔 Alerts: 0               | |
+|  |                                       |  +-------------------+          | |
+|  |  ┌──────────────────────────────────┐  |                                 | |
+|  |  │ Jan 20, 11:30 - Slack Message   │  |  RECENT ACTIVITY                 | |
+|  |  │ [Alice]: Project specs ready!    │  |                                 | |
+|  |  └──────────────────────────────────┘  |  +----------------------------+  | |
+|  |                                       |  | Gmail: New email from        |  | |
+|  |  ┌──────────────────────────────────┐  |  │ Project Team (5 min ago)   |  | |
+|  |  │ Jan 20, 10:45 - File Download   │  |  +----------------------------+  | |
+|  |  │ "proposal.pdf" from Gmail        │  |                                 | |
+|  |  └──────────────────────────────────┘  |  +----------------------------+  | |
+|  |                                       |  | Slack: Channel mentioned   |  | |
+|  |  ┌──────────────────────────────────┐  |  │ #general by Alice (10 min) |  | |
+|  |  │ Jan 20, 09:00 - Notion Updated  │  |  +----------------------------+  | |
+|  |  │ "Q1 Project Roadmap"              │  |                                 | |
+|  |  └──────────────────────────────────┘  |                                 | |
+|  |                                       |                                 | |
+|  |  ┌──────────────────────────────────┐  |  +----------------------------+  | |
+|  |  │ Jan 19, 16:00 - Email           │  |  | OneDrive: File synced        |  | |
+|  |  │ "Meeting Notes" from Bob         │  |  +----------------------------+  | |
+|  |  └──────────────────────────────────┘  |                                 | |
+|  |                                       |                                 | |
+|  +----------------------------------------+  +-------------------+          |
+|                                         |                                 |
++----------------------------------------+-------------------------------------+
+
+5.2 GRAPH VIEW - RELATIONSHIP MAPPING
+-------------------------------------
+
++-----------------------------------------------------------------------------+
+|  OMNILINKER GRAPH                     [🎛️ Tools]     [+ Add Node]          |
++-----------------------------------------------------------------------------+
+|                                                                            |
+|  +--------------------------------------------------+                      |
+|  |  LAYOUT OPTIONS:                                 |                      |
+|  |  ☑️ Force Directed        ☐ Hierarchical         |                      |
+|  |  ☑️ Cluster by Source       ☐ Timeline           |                      |
+|  +--------------------------------------------------+                      |
+|                                                                            |
+|  NODES (People, Files, Conversations)                                      |
+|                                                                            |
+|                    [Alice Johnson]                                         |
+|                     /    \                                                |
+|            ┌────────┴──────┴────────┐                                     |
+|           │                        │                                      |
+|    +------+------+              +-----+                                   |
+|   /|     |      |\              |     |                                    |
+|  [Slack] [Email]                [Gmail]                                  |
+|   / \     |     / \             /   \                                     |
+|  /   \    |    /   \           /     \                                    |
+| [File]|   |   [File]|         [Doc]  |                                     |
+| ------|   |---------|          -----|---                                   |
+|       |   |         \             /                                         |
+|  +----+   +----------+-----------+                                            |
+|  │ #general-channel  │ Project Q1 Plan                                    │
+|  └───────────────────┴────────────────────────────────────────────────────┘ |
+|                                                                            |
+|  LEGEND:                                                                    |
+|  ● People (Contacts, Users)                                                |
+|  ○ Files/Documents                                                          |
+|  ◇ Conversations/Channels                                                   |
+|  □ Events                                                                   |
+|                                                                            |
++-----------------------------------------------------------------------------+
+
+5.3 FILE EXPLORER - CROSS-CLOUD VIEWS
+-------------------------------------
+
++-----------------------------------------------------------------------------+
+|  OMNILINKER FILES                 [🔍 Search...]     [+ New Folder]        |
++-----------------------------------------------------------------------------+
+|                                                                            |
+|  +--------------------------------------------------+                      |
+|  |  FILTER BAR                                      |                      |
+|  |  ☑️ All Clouds        ☐ Gmail                    |                      |
+|  |  ☐ Slack            ☐ OneDrive                   |                      |
+|  |  ☐ Dropbox          ☐ Google Drive               |                      |
+|  +--------------------------------------------------+                      |
+|                                                                            |
+|  +--------------------------------------------------+                      |
+|  |  QUICK ACTIONS                                   |                      |
+|  |  [📤 Upload]   [🗑️ Move to Trash]      [+ ⚙️]  |                      |
+|  +--------------------------------------------------+                      |
+|                                                                            |
+|  FILE TREE (Unified Cloud Storage)                                         |
+|                                                                            |
+|  📁 WORK                             [Modified: Today]                    |
+|     └─ 📄 Project_Specs_v2.docx    (45KB) • Google Drive                 |
+|     └─ 📄 Meeting_Notes.pdf        (1.2MB) • OneDrive                     |
+|     └─ 📁 Q1_Planning/                                                      |
+|          ├─ 📄 Budget_Review.xlsx   (28KB) • Google Drive                |
+|          ├─ 📄 Timeline_Mockup.fig  (560KB) • Figma                      |
+|          └─ 📁 Resources/                                                   |
+|               └─ 📄 Team_Photos.zip  (4.5MB) • Dropbox                    |
+|                                                                            |
+|  +--------------------------------------------------+                      |
+|  |  DETAILS PANEL                                    |                      |
+|  |                                                  |                      |
+|  |  Project_Specs_v2.docx                          |                      |
+|  |  ───────────────────────────────────────────────│                      |
+|  |  Size:    45KB                                  │                      |
+|  |  Type:    Microsoft Word Document                 │                      |
+|  |  Location: Google Drive • Documents/Work         │                      |
+|  |                                                  │                      |
+|  |  ✏️ EDIT     📤 SHARE        🔗 EXPORT            │                      |
+|  +------------------------------------------------+                      |
+|                                                                            |
++-----------------------------------------------------------------------------+
+
+5.4 SEARCH MODAL - NATURAL LANGUAGE QUERIES
+-------------------------------------------
+
++-----------------------------------------------------------------------------+
+|  OMNILINKER SEARCH                                    [+ Cancel]          |
++-----------------------------------------------------------------------------+
+|                                                                            |
+|  +--------------------------------------------------+                      |
+|  |  NATURAL LANGUAGE QUERY                          |                      |
+|  |                                                  |                      |
+|  |  "Show me all files linked to my WhatsApp chats |                      |
+|  |   with Alice in September"                       |                      |
+|  +--------------------------------------------------+                      |
+|                                                                            |
+|  +--------------------------------------------------+                      |
+|  |  FILTERS                                         |                      |
+|  |                                                  |                      |
+|  |  Source Type: [☑️ All]                          |                      |
+|  |            [ ☐ Email ]    [ ☐ Messaging ]       |                      |
+|  |            [ ☐ Files ]      [ ☐ Notes ]          |                      |
+|  |                                                  |                      |
+|  |  Date Range:        [+ Add Filter]              |                      |
+|  |  └─ From: Jan 1,    To: Oct 31                  |                      |
+|  |                                                  |                      |
+|  |  People:            [+ Add Filter]              |                      |
+|  |  └─ Alice Johnson   [x]                         |                      |
+|  |                                                  |                      |
+|  +--------------------------------------------------+                      |
+|                                                                            |
+|  +--------------------------------------------------+                      |
+|  |  RESULTS (5 found)                               |                      |
+|  |                                                  |                      |
+|  |  #1. proposal.pdf                                 │                      |
+|  |      ──────────────────────                       │                      |
+|  |      Source: WhatsApp Business                    │                      |
+|  |      Shared in chat with Alice Johnson            │                      |
+|  |      Date: Sept 15, 2024                         │                      |
+|  |      Size: 2.3 MB                                │                      |
+|  |                                                   │                      |
+|  |      "Here's the updated proposal document..."    │                      |
+|  |                                                  │                      |
+|  |  #2. project_specs_v2.docx                        │                      |
+|  |      ───────────────────────────                   │                      |
+|  |      Source: Google Drive                         │                      |
+|  |      Linked from Slack message by Alice           │                      |
+|  |      Date: Sept 12, 2024                          │                      |
+|  |                                                   │                      |
+|  +------------------------------------------------+                      |
+|                                                                            |
++-----------------------------------------------------------------------------+
+
+5.5 AI INSIGHTS PANEL - PREDICTIVE ANALYTICS
+--------------------------------------------
+
++-----------------------------------------------------------------------------+
+|  OMNILINKER DASHBOARD    [+ AI Insights]                                   |
++-----------------------------------------------------------------------------+
+|                                                                            |
+|  +--------------------------------------------------+                      |
+|  |  AI SUMMARY:                                     |                      |
+|  |                                                  |                      |
+|  |  Based on your recent communications, you're   |                      |
+|  |  actively working on the "Q1 Project"          |                      |
+|  |  with team members across multiple platforms.  |                      |
+|  |                                                  |                      |
+|  |  ⏰ UPCOMING DEADLINES:                          │                      |
+|  |     • Sprint Planning Document due: Sept 30    │                      |
+|  |     • Project Specs Review meeting: Oct 5      │                      |
+|  |     • Client Presentation draft needed: Oct 12│                      |
+|  |                                                  |                      |
+|  |  🔗 HIDDEN CONNECTIONS DETECTED:                │                      |
+|  |     - You mentioned "budget" in 14 WhatsApp    │                      |
+|  |       chats with Alice                          │                      |
+|  |     - The same file is attached to              │                      |
+|  |       3 different Slack threads                  │                      |
+|  |                                                  |                      |
+|  +--------------------------------------------------+                      |
+|                                                                            |
++-----------------------------------------------------------------------------+
+
+================================================================================
+6.0 SAMPLE QUERIES & USE CASES
+================================================================================
+
+6.1 NERUAL LANGUAGE SEARCH EXAMPLES
+-----------------------------------
+
+Query 1: "Show me all files linked to my WhatsApp chats with Alice in September"
+```python
+# Pseudocode for search service
+def execute_search(query: str, filters: Dict) -> List[Dict]:
+    
+    # Step 1: Parse natural language query using NLP
+    parsed = parse_nlp_query(query)
+    
+    result = {
+        'source_type': [parsed.get('source_type', ['all'])],
+        'entities': parsed.get('people', []),
+        'date_range': parsed.get('dates', {}),
+        'keywords': parsed.get('topics', [])
+    }
+    
+    # Step 2: Fetch WhatsApp messages with Alice in September
+    whatsapp_messages = fetch_cross_platform_data(
+        source='whatsapp_business',
+        entity_filters={'people': ['Alice Johnson']},
+        date_range={'start': '2024-09-01', 'end': '2024-09-30'}
+    )
+    
+    # Step 3: Extract shared file references
+    linked_files = []
+    for msg in whatsapp_messages:
+        attachments = msg.get('attachments', [])
+        if attachments and attachments[0].get('type') == 'file':
+            file_id = attachments[0].get('file_id')
+            linked_files.append({
+                'universal_id': f"file-{hash(file_id)}",
+                'source_file_id': file_id,
+                'context': msg.get('content', '')[:200]
+            })
+    
+    # Step 4: Return results with provenance
+    return {
+        'query': query,
+        'results': linked_files,
+        'sources_used': ['whatsapp_business'],
+        'entities_matched': [{'name': 'Alice Johnson', 'source': 'whatsapp'}],
+        'timestamp': datetime.now().isoformat()
+    }
+```
+
+Query 2: "Find all emails from Bob about the Q1 budget"
+```python
+def execute_search_natural_language(query: str) -> SearchResults:
+    
+    # Extract entities and keywords
+    query_analysis = {
+        'sender': ['Bob'],
+        'topics': ['Q1', 'budget'],
+        'source_type': 'email'
+    }
+    
+    # Execute cross-platform search
+    results = []
+    
+    # Search in Gmail
+    gmail_search = search_gmail(
+        query='from:Bob budget Q1',
+        sender_filter=query_analysis['sender']
+    )
+    results.extend(gmail_search)
+    
+    # Search in Outlook if available
+    if user.has_outlook_connection():
+        outlook_search = search_outlook(
+            keywords=query_analysis['topics']
+        )
+        results.extend(outlook_search)
+    
+    # Enrich with file attachments
+    attached_files = []
+    for email in results:
+        for attachment in email.get('attachments', []):
+            if not any(f['universal_id'] == attachment['id'] for f in results):
+                attached_files.append(attachment)
+    
+    return SearchResults(
+        query=query,
+        emails=results,
+        attached_files=attached_files,
+        total_count=len(results) + len(attached_files)
+    )
+```
+
+6.2 GRAPH QUERIES (Neo4j Cypher Examples)
+-----------------------------------------
+
+Query 1: "Find all people who shared files in the same Slack channel as Alice"
+```cypher
+// Find files shared by Alice in Slack channels
+MATCH (alice:Person {display_name: 'Alice Johnson'})-[:MESSAGE]->
+     (slack_channel:SlackChannel)<-[:MEMBER]-(other_member:Person)
+
+OPTIONAL MATCH (shared_file:File)
+WHERE (alice)-[:ATTACHMENT]->(shared_file)
+
+RETURN DISTINCT other_member.display_name AS person,
+       shared_file.name AS filename,
+       COUNT(DISTINCT slack_channel.id) AS channels_shared_in
+
+ORDER BY channels_shared_in DESC
+LIMIT 10;
+```
+
+Query 2: "Show me files that appear in both email attachments and chat messages"
+```cypher
+// Identify files with multi-platform presence
+MATCH (file:File)<-[:ATTACHMENT]-(email:Email),
+      (file)-[:LINKED_TO]->(chat_message:Message)
+
+RETURN file.name AS filename,
+       'Email' AS source1,
+       'Messaging' AS source2,
+       email.subject AS email_subject,
+       chat_message.sender AS chat_sender
+ORDER BY file.created_at DESC;
+```
+
+Query 3: "Find my most active communication partners"
+```cypher
+// Centrality-based relationship analysis
+MATCH (me:Person {email: 'john.doe@example.com'})
+CALL apoc.path.subgraphNodes(me, {maxLevel: 1}) YIELD nodes AS connected_nodes
+WHERE connected_nodes[0] <> me
+
+WITH me, connected_nodes, collect(connected_nodes) AS people_list
+MATCH (p:Person) WHERE p IN people_list
+OPTIONAL MATCH (p)-[:MESSAGE]->(:Message)
+WITH p, size((p)-[:MESSAGE]->()) as message_count, date(p.last_message) as last_contact
+ORDER BY message_count DESC
+
+RETURN p.display_name AS person,
+       message_count AS messages_sent,
+       last_contact,
+       collect(DISTINCT (p)-[:MESSAGE]->(m)) AS recent_conversations
+LIMIT 10;
+```
+
+Query 4: "Cluster my communications by topic"
+```cypher
+// Topic-based clustering using community detection
+MATCH (person:Person {email: 'john.doe@example.com'})-[]-(other)
+OPTIONAL MATCH (person)-[:MESSAGE]->(m:Message)<-[:MESSAGE]-(other)
+
+WITH person, other, m, 
+     apoc.text.tokenize(m.content) AS tokens
+CALL db.create.cypher('unwind tokens as token
+WHERE size(token) > 0 AND length(token) < 15
+RETURN token') YIELD value
+MATCH (community:Community)
+WHERE community.name IN ['Project Q1', 'Budget Planning', 'Team Updates']
+
+WITH person, other, m, collect(DISTINCT community.name) AS topics
+RETURN distinct p.display_name AS person_name,
+       size(topics) AS topic_count,
+       topics
+
+ORDER BY size(topics) DESC;
+```
+
+6.3 SEARCH SERVICE API ENDPOINTS
+--------------------------------
+
+REST API Endpoints:
+
+```
+GET    /api/v1/search        # Perform unified search with filters
+POST   /api/v1/search/query  # Natural language query parsing
+GET    /api/v1/relationships # Get relationship graph for entities
+GET    /api/v1/entities/:id # Entity details with cross-platform presence
+POST   /api/v1/clusters     # Create topic/person clusters
+
+Query Parameters:
+  ?source_type=all|email|messaging|files|notes|history
+  ?entity_type=person|file|message|note
+  ?limit=50&offset=0
+  ?filters[source]=gmail|slack|discord
+```
+
+JSON Request Example:
+```json
+{
+  "query": "project budget files",
+  "source_types": ["email", "files"],
+  "date_from": "2024-01-01T00:00:00Z",
+  "date_to": "2024-01-20T23:59:59Z",
+  "entities": ["John Doe"],
+  "limit": 20
+}
+```
+
+Expected Response:
+```json
+{
+  "query_id": "search_q1a2b3c4d5e6f",
+  "results": [
+    {
+      "type": "file",
+      "universal_id": "file-universal-proposal001",
+      "name": "budget_proposal.pdf",
+      "sources": [
+        {
+          "source_type": "email",
+          "platform": "gmail",
+          "context": "attached to email from Finance Team"
+        },
+        {
+          "source_type": "messaging", 
+          "platform": "slack",
+          "context": "shared in #finance channel"
+        }
+      ],
+      "related_entities": ["Alice Johnson", "Finance Team"],
+      "created_at": "2024-01-18T16:30:00Z"
+    }
+  ],
+  "total_count": 5,
+  "sources_used": ["gmail", "slack"],
+  "execution_time_ms": 245
+}
+```
+
+================================================================================
+7.0 SECURITY MODEL
+================================================================================
+
+7.1 END-TO-END ENCRYPTION ARCHITECTURE
+--------------------------------------
+
++----------------------------------------------------------------------------------+
+|                               ENCRYPTION LAYER                                    |
++----------------------------------------------------------------------------------+
+|                                                                                  |
+|  [User Data at Rest]     [Data in Transit]    [API Keys]    [Session Tokens]       |
+|          |                   |                 |              |                    |
+|  AES-256 (DB)            TLS 1.3             RSA-4096      JWT (HS256/JWS)       |
+|          |                   |                 |              |                    |
+|  MongoDB Encryption at    HTTPS/WSS         Vault/KMS     Short-lived tokens      |
+|  Rest (EAE)                                    +                  +               |
+|                                                                                   |
+|  Key Management:                                                                |
+|  - Database encryption keys stored in Azure Key Vault / AWS KMS                |
+|  - API secrets in HashiCorp Vault with automatic rotation                       |
+|  - User-level file encryption with per-user keys                                |
+|                                                                                  |
++----------------------------------------------------------------------------------+
+
+7.2 PERMISSION MATRIX DESIGN
+----------------------------
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          PERMISSION MATRIX                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  User: john.doe@example.com                                                 │
+│  ─────────────────────────────────────────────────────────────────────────   │
+│                                                                              │
+│  +------------------+--------------+----------------------------------------+ │
+│  | Source           | Permission    | Data Access Scope                      │ │
+│  +------------------+--------------+----------------------------------------+ │
+│  | Gmail            | Read/Write     | Inbox, Sent, Drafts (all folders)          │ │
+│  | Slack            | Read/Write     | Direct messages, joined channels           │ │
+│  | Google Drive     | Read-only     | /work folder only                        │ │
+│  | OneDrive         | Full access    | All personal files + shared        │ │
+│  | WhatsApp         | Read-only     | Business API messages (archived)      │ │
+│  | Notion           | Full access    | Workspace pages, blocks               │ │
+│  | Discord          | Read-only     | Channel messages only                 │ │
+│  | Dropbox          | Full access    | /documents and /work folders             │ │
+│  | YouTube          | Read-only     | Watch history (no downloads)          │ │
+│  | Browsing History| Read-only     | Browser extension synced data            │ │
+│  +------------------+--------------+----------------------------------------+ │
+│                                                                              │
+│  Permission Levels:                                                          │
+│  - Full access: Can read, write, modify source data                         │
+│  - Read/Write: Can read and write but cannot delete                         │
+│  - Read-only: Can only view data, no modifications                           │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+```
+
+7.3 DATA MINIMIZATION STRATEGY
+------------------------------
+
+- **Local-first Processing**: Sensitive operations (e.g., content extraction) run in Docker containers that are destroyed after processing
+- **Field-level Encryption**: Email bodies, file contents encrypted with user-specific keys before database storage
+- **Anonymized Analytics**: Aggregated usage metrics collected for feature development without PII
+- **Right to Delete**: Cascade delete from user profile removes all linked data
+
+7.4 API SECURITY IMPLEMENTATION
+-------------------------------
+
+```python
+# Security middleware for API routes
+from fastapi import Request, HTTPException
+from pydantic import BaseModel
+from typing import Dict, Any
+import jwt
+
+class RateLimitConfig:
+    requests_per_minute = 60
+    requests_per_hour = 1000
+
+class SecurityMiddleware:
+    
+    def __init__(self):
+        self.rate_limits = {}
+        
+    async def authenticate_request(self, request: Request) -> bool:
+        """Validate JWT token from Authorization header"""
+        auth_header = request.headers.get("Authorization")
+        
+        if not auth_header or not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Invalid authentication")
+            
+        token = auth_header.split(" ")[1]
+        try:
+            payload = jwt.decode(
+                token,
+                options={"verify_signature": True},
+                algorithms=["HS256"]
+            )
+            
+            # Check token expiry
+            if datetime.fromtimestamp(payload['exp']) < datetime.utcnow():
+                raise HTTPException(status_code=401, detail="Token expired")
+                
+            return payload
+            
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(status_code=401, detail="Token expired")
+        except jwt.InvalidTokenError:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    
+    async def check_rate_limit(self, user_id: str, endpoint: str) -> bool:
+        """Check rate limit for API endpoint"""
+        key = f"{user_id}:{endpoint}"
+        
+        now = datetime.utcnow()
+        
+        # Clean up expired requests
+        self.rate_limits[key] = [
+            t for t in self.rate_limits.get(key, []) 
+            if now - t < timedelta(minutes=1)
+        ]
+        
+        # Check against limit
+        if len(self.rate_limits[key]) >= RateLimitConfig.requests_per_minute:
+            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+            
+        self.rate_limits[key].append(now)
+        return True
+    
+    def add_security_headers(self, response: Response):
+        """Add security headers to all responses"""
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+```
+
+7.5 COMPLIANCE CONSIDERATIONS
+-----------------------------
+
+| Framework     | Implementation                                          |
+|--------------|--------------------------------------------------------|
+| GDPR         | Data residency controls, right to erasure endpoints    |
+| SOC2         | Audit logging, access controls, encryption             |
+| CCPA         | Consumer data export functionality                     |
+| HIPAA        | BAA agreements for healthcare data sources             |
+
+================================================================================
+8.0 IMPLEMENTATION ROADMAP
+================================================================================
+
+8.1 PHASE-BY-PHASE BREAKDOWN
+----------------------------
+
+PHASE 1: CORE FOUNDATION (Weeks 1-4)
+┌─────────────────────────────────────────────────────────────┐
+│                                                              │
+│  ✓ MongoDB schema design and data models                     │
+│  ✓ Neo4j graph database setup with relationship schemas      │
+│  ✓ React + Next.js dashboard UI scaffold                      │
+│  ✓ Auth service with OAuth2 flow implementation               │
+│  ✓ PostgreSQL user account management                         │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+
+PHASE 2: EMAIL INTEGRATION (Weeks 5-7)
+┌─────────────────────────────────────────────────────────────┐
+│                                                              │
+│  ✓ Gmail connector implementation with OAuth2                │
+│  ✓ Outlook connector with Microsoft Graph API                 │
+│  ✓ Email parsing and attachment extraction                    │
+│  ✓ Email webhook subscription for real-time sync              │
+│  ✓ Cross-platform email deduplication                        │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+
+PHASE 3: CLOUD STORAGE INTEGRATION (Weeks 8-10)
+┌─────────────────────────────────────────────────────────────┐
+│                                                              │
+│  ✓ Google Drive connector                                     │
+│  ✓ OneDrive connector with Azure AD                          │
+│  ✓ Dropbox API integration                                     │
+│  ✓ Cross-platform file ID mapping                             │
+│  ✓ Universal file ID generation for deduplication             │
+│  ✓ File metadata extraction and enrichment                    │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+
+PHASE 4: MESSAGING PLATFORMS (Weeks 11-13)
+┌─────────────────────────────────────────────────────────────┐
+│                                                              │
+│  ✓ Slack events API integration                                │
+│  ✓ Discord bot and webhook setup                              │
+│  ✓ WhatsApp Business API connection                            │
+│  ✓ Message deduplication across platforms                      │
+│  ✓ Conversation thread reconstruction                          │
+│  ✓ Reaction tracking                                            │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+
+PHASE 5: NOTES & BROWSING HISTORY (Weeks 14-16)
+┌─────────────────────────────────────────────────────────────┐
+│                                                              │
+│  ✓ Notion API integration with block parsing                  │
+│  ✓ Evernote EDN format support                                 │
+│  ✓ Browsing history API connection                              │
+│  ✓ Cross-platform note ID mapping                               │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+
+PHASE 6: SEARCH & DISCOVERY (Weeks 17-20)
+┌─────────────────────────────────────────────────────────────┐
+│                                                              │
+│  ✓ Elasticsearch cluster setup                                │
+│  ✓ Hybrid search implementation (BM25 + Dense Vectors)        │
+│  ✓ Natural language query parser                               │
+│  ✓ Entity extraction from queries                              │
+│  ✓ Cross-platform result aggregation                           │
+│  ✓ Semantic similarity scoring                                  │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+
+PHASE 7: GRAPH VISUALIZATION (Weeks 21-23)
+┌─────────────────────────────────────────────────────────────┐
+│                                                              │
+│  ✓ D3.js graph visualization library                           │
+│  ✓ Force-directed layout implementation                         │
+│  ✓ Node/edge filtering and interaction                          │
+│  ✓ Cluster detection algorithms (Louvain)                       │
+│  ✓ Relationship highlighting                                    │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+
+PHASE 8: AI INSIGHTS (Weeks 24-27)
+┌─────────────────────────────────────────────────────────────┐
+│                                                              │
+│  ✓ LLM integration for summarization                           │
+│  ✓ Entity relationship suggestion engine                        │
+│  ✓ Timeline event prediction                                    │
+│  ✓ Topic clustering using LDA/BERTopic                         │
+│  ✓ Deadline detection from communication patterns                │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+
+PHASE 9: SECURITY & OPTIMIZATION (Weeks 28-30)
+┌─────────────────────────────────────────────────────────────┐
+│                                                              │
+│  ✓ End-to-end encryption implementation                          │
+│  ✓ Rate limiting and request throttling                         │
+│  ✓ Security audit and vulnerability remediation                  │
+│  ✓ Performance optimization (caching, query optimization)        │
+│  ✓ Load testing and scaling                                    │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+
+8.2 TECHNICAL DEPENDENCIES
+--------------------------
+
+Backend:
+```json
+{
+  "core": {
+    "python": "^3.11",
+    "framework": ["fastapi", "uvicorn"],
+    "async": ["aiohttp", "aioredis"]
+  },
+  "data": {
+    "database": [
+      "motor",        // MongoDB async driver
+      "neo4j-driver"  // Neo4j graph database driver
+    ],
+    "orm": ["sqlalchemy"]
+  },
+  "auth": {
+    "oauth2": [
+      "python-jose",
+      "msal"         // Microsoft Authentication Library
+    ]
+  },
+  "nlp": {
+    "nlp": ["spaCy", "sentence-transformers"],
+    "llm": ["langchain", "transformers"]
+  }
+}
+```
+
+Frontend:
+```json
+{
+  "framework": "nextjs@14",
+  "ui_library": "tailwindcss",
+  "graph_viz": "d3.js@7",
+  "state_management": "zustand",
+  "http_client": "axios"
+}
+```
+
+DevOps:
+```json
+{
+  "containerization": ["docker", "docker-compose"],
+  "orchestration": "kubernetes",
+  "ci_cd": [
+    "github-actions",
+    "terraform"
+  ],
+  "monitoring": [
+    "prometheus",
+    "grafana"
+  ]
+}
+```
+
+8.3 DOCKERIZATION STRATEGY
+--------------------------
+
+Multi-stage Dockerfile for optimized images:
+
+```dockerfile
+# Stage 1: Build stage
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app/ ./app/
+RUN python -m compileall app/
+
+# Stage 2: Production stage
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY --from=builder /app/app ./app
+COPY --from=builder /usr/local/lib/python3.11/site-packages ./site-packages
+
+# Add non-root user
+RUN addgroup --system appgroup && \
+    adduser --system --ingroup appgroup appuser
+
+USER appuser
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+================================================================================
+9.0 DEPLOYMENT ARCHITECTURE
+================================================================================
+
++-----------------------------------------------------------------------------+
+|                              DEPLOYMENT LAYOUT                               |
+|                                                                             |
+|  +--------------------------------------------------+                       |
+|  |              FRONTEND (Next.js)                   |                       |
+|  |         Deployed on Vercel / AWS S3              |                       |
+|  +--------------------------┬─────────────────────────+                      |
+|                             │                                               |
+|  +--------------------------v─────────────────────────+                      |
+|  |                    API GATEWAY                     |                      |
+|  |                  (nginx/kong)                     |                      |
+|  +---------------------------------------------------+                      |
+|                             │                                               |
+|  +-------------------------v------+-------------+---------------+            |
+|  |                              │             │              │              |
+|  |    +--------------+   +-------+----+ +-----+--+ +--------+--│            |
+|  |    │ Sync Service │   │ Auth       │ │ Search│ │ Graph  │ │              |
+|  |    +------+-------+   │ Service     │ │ Serv. │ │ Serv.  │ │              |
+|  |    +----v---┐  ┌-----+----+   ┌-----+--┐ │ │      │ │              |
+|  |    │ Slack   │  │ Gmail   │   │MongoDB│ │ Neo4j│ │PostgreSQL││            |
+|  |    │ API     │  │ API     │   │       │ │ DB   │ │ DB      ││            |
+|  |    +---------┘  +---------+   +-------+----+ +--------+--│              |
+|  |          │                              │                │              |
+|  |    +-----v------+                      +----------------+             |
+|  |    │ AI Service │                       │ Notifications │              |
+|  |    +------------+                       +---------------+              |
+|  +---------------------------------------------------+-----------------+   |
+|                                                                             |
+|  ┌──────────────────┐     ┌───────────────────┐     ┌────────────────────┐ │
+|  │    Load Balancer │────>│    Cloud Storage  │     │     Redis Cache    │ │
+|  │       (AWS ALB)  │     │   (S3/GCS/AD)     │     │                    │ │
+|  └──────────────────┘     └───────────────────┘     └────────────────────┘ │
+|                                                                             |
++-----------------------------------------------------------------------------+
+
+================================================================================
+                         END OF BLUEPRINT DOCUMENT
+================================================================================
+Generated: September 25, 2026
+Version: 1.0
+Status: Ready for Engineering Implementation
+
+For questions or clarifications, refer to:
+- API Integration Plan (Section 3)
+- Database Schema (Section 4)
+- UI Mockups (Section 5)
+- Security Model (Section 7)
